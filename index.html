@@ -1,0 +1,318 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CarIQ AI — Ask Anything About Cars</title>
+<meta name="description" content="Ask car questions and get AI explanations, diagrams and a question score.">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;color:#edf5ff;font-family:Arial,sans-serif;background:radial-gradient(ellipse at top right,#153a54,transparent 60%),#080e19;min-height:100vh}
+main{max-width:920px;margin:auto;padding:22px}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ffffff20;padding:6px 0 20px}
+.logo{font-size:26px;font-weight:bold}.logo span{color:#5ce6d9}header small{color:#9bb0c8}
+.hero{text-align:center;padding:52px 0 25px}
+.hero h1{font-size:clamp(33px,6vw,56px);margin:9px 0}
+.hero h1 span{color:#5ce6d9}
+.hero p{color:#b4c9e0;line-height:1.5}
+.box{background:#111d30;border:1px solid #344a62;border-radius:18px;padding:23px;margin:16px 0;box-shadow:0 14px 50px #0004}
+label{display:block;font-weight:bold;font-size:13px;margin-bottom:12px}
+textarea{width:100%;min-height:115px;padding:15px;font-size:16px;line-height:1.5;background:#080f1d;border:1px solid #455d76;border-radius:12px;color:white;resize:vertical}
+select{background:#0b1527;color:white;border:1px solid #455d76;border-radius:10px;padding:13px}
+.actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+button{cursor:pointer;font-weight:bold}
+.ask{border:0;color:#07151e;padding:14px 22px;background:linear-gradient(90deg,#5ce6d9,#83b6ff);border-radius:12px}
+.ask:disabled{opacity:.5}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.chips button,.tab{background:#182c43;color:#e4f3ff;border:1px solid #3c5772;padding:10px 13px;border-radius:20px}
+.chips button:hover,.tab:hover{border-color:#5ce6d9}
+#answer,#error,#loading{display:none}
+#error{color:#ffd0d0}
+#loading{color:#8fffe8}
+h2{margin-top:7px;font-size:26px}
+h3{color:#b8e9ee;margin-top:0}
+.muted{color:#b6c8d9;line-height:1.6}
+.scoregrid,.answergrid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.score strong{font-size:31px;color:#5ce6d9}
+.bar{height:7px;border-radius:9px;background:#314054;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#5ce6d9}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.tab{border-radius:9px}
+.tab.active{background:#5ce6d9;color:#09202b}
+#explanation{white-space:pre-wrap;line-height:1.7;color:#d8e7f7}
+svg{width:100%;background:#0b1929;border-radius:12px;margin-top:10px}
+svg text{font-family:Arial,sans-serif}
+#steps li{margin:12px 0;line-height:1.5}
+#followups button{display:block;text-align:left;width:100%;border:1px solid #3b506c;border-radius:9px;background:#182b43;color:#d8efff;margin:8px 0;padding:12px}
+.note{padding:12px;background:#2d2d28;border-left:3px solid #eac071;color:#fff1c9;border-radius:8px;font-size:13px;line-height:1.5}
+a{color:#74e8e4}
+footer{text-align:center;color:#829ab5;font-size:12px;padding:24px}
+@media(max-width:650px){
+.scoregrid,.answergrid{grid-template-columns:1fr}
+.hero{padding-top:30px}
+.actions select,.ask{width:100%}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="logo">🚘 CarIQ <span>AI</span></div>
+<small>CAR KNOWLEDGE, MADE SIMPLE</small>
+</header>
+
+<section class="hero">
+<h1>Ask <span>anything</span> about cars.</h1>
+<p>From your first engine question to advanced automotive engineering.<br>
+Understand the answer with simple words, diagrams and question ratings.</p>
+</section>
+
+<section class="box">
+<label for="question">WHAT DO YOU WANT TO KNOW?</label>
+<textarea id="question" maxlength="1000" placeholder="Why do turbocharged cars lose power in hot weather?"></textarea>
+
+<div class="actions">
+<select id="level" aria-label="Explanation level">
+<option value="beginner">Explain like I'm a beginner</option>
+<option value="enthusiast">Car enthusiast</option>
+<option value="engineering">Engineering level</option>
+</select>
+<button id="ask" class="ask">Ask CarIQ AI →</button>
+</div>
+
+<div style="margin-top:16px" class="cf-turnstile"
+data-sitekey="PASTE_PUBLIC_TURNSTILE_SITE_KEY"
+data-callback="verified"
+data-expired-callback="expired"
+data-theme="dark"></div>
+
+<p class="muted" style="font-size:12px">AI answers can be wrong. For safety-critical repairs, consult a qualified mechanic.</p>
+</section>
+
+<div class="chips">
+<button data-q="How does a turbocharger work?">⚙️ Turbochargers</button>
+<button data-q="What is horsepower versus torque?">🏎️ HP vs torque</button>
+<button data-q="How does regenerative braking work in EVs?">⚡ EV braking</button>
+<button data-q="Why do car brakes overheat?">🛞 Brakes</button>
+</div>
+
+<div id="loading" class="box" role="status">⏳ Thinking about your car question...</div>
+<div id="error" class="box" role="alert"></div>
+
+<article id="answer" aria-live="polite">
+<div class="box">
+<small style="color:#5ce6d9">YOUR CAR ANSWER</small>
+<h2 id="headline"></h2>
+<p id="summary" class="muted"></p>
+</div>
+
+<div class="scoregrid">
+<section class="box score">
+<h3>Question difficulty</h3>
+<strong id="depth">—</strong><span>/100</span>
+<div class="bar"><i id="depthbar"></i></div>
+<p class="muted">How technical the question is.</p>
+</section>
+<section class="box score">
+<h3>Question quality</h3>
+<strong id="quality">—</strong><span>/100</span>
+<div class="bar"><i id="qualitybar"></i></div>
+<p class="muted">Curiosity and clarity, not intelligence.</p>
+</section>
+</div>
+
+<div class="answergrid">
+<section class="box">
+<h3>📖 Explanation</h3>
+<div class="tabs">
+<button class="tab" data-level="beginner">Beginner</button>
+<button class="tab" data-level="enthusiast">Enthusiast</button>
+<button class="tab" data-level="engineering">Engineering</button>
+</div>
+<div id="explanation"></div>
+</section>
+
+<section class="box">
+<h3>🖼️ Visual explanation</h3>
+<p id="visualtitle" class="muted"></p>
+<svg id="diagram" viewBox="0 0 600 230" role="img" aria-label="Simplified automotive concept diagram"></svg>
+<p class="muted" style="font-size:12px">Concept illustration, not an exact mechanical diagram.</p>
+<a id="images" target="_blank" rel="noopener noreferrer">See related car pictures ↗</a>
+</section>
+</div>
+
+<div class="answergrid">
+<section class="box">
+<h3>🧠 Learn in 3 steps</h3>
+<ol id="steps"></ol>
+</section>
+<section class="box">
+<h3>⭐ Why this score?</h3>
+<p class="muted" id="reason"></p>
+<p class="note" id="caution"></p>
+</section>
+</div>
+
+<section class="box">
+<h3>What should you ask next?</h3>
+<div id="followups"></div>
+</section>
+</article>
+
+<footer>CarIQ AI · Educational student project · No live vehicle diagnostics</footer>
+</main>
+
+<script>
+// Replace with your PUBLIC Cloudflare Worker URL, including /ask.
+const API_URL = 'https://YOUR-WORKER.workers.dev/ask';
+
+// Never put your secret Gemini API key in this file.
+const $=id=>document.getElementById(id);
+let token='',answer=null;
+
+window.verified=t=>token=t;
+window.expired=()=>token='';
+
+document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{
+ $('question').value=b.dataset.q;
+ window.scrollTo({top:0,behavior:'smooth'});
+});
+
+document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>showLevel(b.dataset.level));
+
+function showLevel(level){
+ document.querySelectorAll('[data-level]').forEach(b=>
+  b.classList.toggle('active',b.dataset.level===level));
+ if(answer)$('explanation').textContent=answer[level]||'No explanation available.';
+}
+
+function draw(type){
+ const diagrams={
+  turbo:['💨 Exhaust','🌀 Turbo','🚀 More air'],
+  engine:['⛽ Fuel + air','🔥 Ignition','⚙️ Motion'],
+  brakes:['🦶 Brake pedal','🧰 Brakes','🛞 Slower wheel'],
+  ev:['🔋 Battery','⚡ Motor','🛞 Movement'],
+  transmission:['⚙️ Engine','🔩 Gearbox','🛞 Wheels'],
+  tires:['🛞 Tire','↔️ Grip','🛣️ Road'],
+  suspension:['🛣️ Bump','🌀 Spring','🚙 Stability'],
+  aerodynamics:['💨 Air','🚘 Car body','⬇️ Drag'],
+  generic:['❓ Question','🧠 Concept','💡 Answer']
+ };
+ const values=diagrams[type]||diagrams.generic;
+ const svg=$('diagram');
+ svg.replaceChildren();
+ const ns='http://www.w3.org/2000/svg';
+
+ function node(tag,attrs,label){
+  const e=document.createElementNS(ns,tag);
+  Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));
+  if(label)e.textContent=label;
+  svg.appendChild(e);
+ }
+
+ values.forEach((value,i)=>{
+  const x=14+i*198;
+  node('rect',{x:String(x),y:'40',width:'175',height:'140',
+   rx:'15',fill:'#19364a',stroke:'#3d7885'});
+  node('text',{x:String(x+87),y:'116','text-anchor':'middle',
+   fill:'#efffff','font-size':'16'},value);
+  if(i<2)node('text',{x:String(x+186),y:'116',
+   fill:'#5ce6d9','font-size':'20'},'→');
+ });
+}
+
+function display(a){
+ answer=a;
+ $('headline').textContent=a.headline||'Your answer';
+ $('summary').textContent=a.short_answer||'';
+
+ for(const [id,key] of [
+  ['depth','depth_score'],['quality','quality_score']
+ ]){
+  const n=Math.max(0,Math.min(100,Number(a[key])||0));
+  $(id).textContent=Math.round(n);
+  $(id+'bar').style.width=n+'%';
+ }
+
+ $('visualtitle').textContent=a.visual_title||'How the system works';
+ draw(a.visual_type);
+
+ $('images').href='https://commons.wikimedia.org/w/index.php?search='+
+  encodeURIComponent(a.visual_search||'car engine')+
+  '&title=Special:MediaSearch&type=image';
+
+ $('steps').replaceChildren();
+ (a.steps||[]).slice(0,3).forEach(s=>{
+  const li=document.createElement('li');
+  li.textContent=s;
+  $('steps').append(li);
+ });
+
+ $('reason').textContent=a.score_reason||'';
+ $('caution').textContent=a.caution||
+  'Check model-specific and safety-critical advice with an expert.';
+
+ $('followups').replaceChildren();
+ (a.followups||[]).slice(0,3).forEach(q=>{
+  const b=document.createElement('button');
+  b.textContent=q;
+  b.onclick=()=>{
+   $('question').value=q;
+   window.scrollTo({top:0,behavior:'smooth'});
+  };
+  $('followups').append(b);
+ });
+
+ showLevel($('level').value);
+ $('answer').style.display='block';
+ $('answer').scrollIntoView({behavior:'smooth'});
+}
+
+$('ask').onclick=async()=>{
+ const question=$('question').value.trim();
+ $('error').style.display='none';
+
+ if(question.length<5){
+  $('error').textContent='Please type a complete car question.';
+  $('error').style.display='block';
+  return;
+ }
+ if(API_URL.includes('YOUR-WORKER')){
+  $('error').textContent='Connect your Cloudflare Worker first.';
+  $('error').style.display='block';
+  return;
+ }
+ if(!token){
+  $('error').textContent='Complete the security check first.';
+  $('error').style.display='block';
+  return;
+ }
+
+ $('ask').disabled=true;
+ $('loading').style.display='block';
+ $('answer').style.display='none';
+
+ try{
+  const res=await fetch(API_URL,{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({question,token})
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Could not generate an answer.');
+  display(data.answer);
+ }catch(err){
+  $('error').textContent=err.message;
+  $('error').style.display='block';
+ }finally{
+  $('ask').disabled=false;
+  $('loading').style.display='none';
+  token='';
+  if(window.turnstile)window.turnstile.reset();
+ }
+};
+</script>
+</body>
+</html>

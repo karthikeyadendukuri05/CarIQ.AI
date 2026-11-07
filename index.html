@@ -240,9 +240,9 @@ function display(a){
  $('visualtitle').textContent=a.visual_title||'How the system works';
  draw(a.visual_type);
 
- $('images').href='https://commons.wikimedia.org/w/index.php?search='+
-  encodeURIComponent(a.visual_search||'car engine')+
-  '&title=Special:MediaSearch&type=image';
+ const imageQuery=typeof a.visual_search==='string' ? a.visual_search.trim() : '';
+ const imageSearch=new URLSearchParams({udm:'2',q:imageQuery||'car engine'});
+ $('images').href='https://www.google.com/search?'+imageSearch;
 
  $('steps').replaceChildren();
  (a.steps||[]).slice(0,3).forEach(s=>{
